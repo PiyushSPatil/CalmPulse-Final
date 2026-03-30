@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CalmPulse – Student Mental Wellness Chatbot</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- LEFT PANEL -->
+      <div class="left-panel">
+        <div class="left-top">
+          <div class="cp-logo">CP</div>
+          <div class="app-name">CalmPulse</div>
+          <div class="tagline">
+            A gentle space to slow down, reflect, and be heard.
+          </div>
+
+          <div class="quote-card">
+            <div class="quote-title">Gentle reminder</div>
+            <div>
+              You don’t have to have it all figured out today. One honest
+              check-in with yourself is already progress.
+            </div>
+          </div>
+
+          <div class="mood-pills">
+            <span class="pill">🌧 Feeling low</span>
+            <span class="pill">😵‍💫 Overwhelmed</span>
+            <span class="pill">😔 Lonely</span>
+            <span class="pill">😟 Anxious</span>
+            <span class="pill">🙂 Just checking in</span>
+          </div>
+        </div>
+
+        <div class="left-footer">
+          CalmPulse is a supportive companion, not a replacement for
+          professional help. If you’re in immediate danger or crisis, please
+          reach out to a trusted person or local helpline.
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="chat-panel">
+        <div class="chat-header">
+          <div class="chat-title-wrap">
+            <div class="chat-title">Check-in</div>
+            <div class="chat-sub">
+              Share what’s on your mind, at your own pace.
+            </div>
+          </div>
+          <div class="status-dot" title="Online"></div>
+        </div>
+
+        <div id="messages"></div>
+
+        <div id="typing">
+          <span>CalmPulse is thinking</span>
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+
+        <div class="input-row">
+          <input
+            type="text"
+            id="input"
+            placeholder="How are you feeling right now?"
+            autocomplete="off"
+          />
+          <button id="send">Send</button>
+        </div>
+
+        <div class="footer-note">
+          Your messages are processed by an AI model and may not always be
+          perfect, but the goal is to support you kindly and non-judgmentally.
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const input = document.getElementById("input");
+      const sendBtn = document.getElementById("send");
+      const messages = document.getElementById("messages");
+      const typing = document.getElementById("typing");
+
+      function scrollToBottom() {
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function addMessage(sender, text, emotion = null) {
+        const row = document.createElement("div");
+        row.classList.add("message-row", sender);
+
+        const bubble = document.createElement("div");
+        bubble.classList.add("bubble", sender);
+
+        const senderLabel = document.createElement("div");
+        senderLabel.classList.add("sender-label");
+        senderLabel.textContent = sender === "user" ? "You" : "CalmPulse";
+
+        const content = document.createElement("div");
+        content.textContent = text;
+
+        bubble.appendChild(senderLabel);
+        bubble.appendChild(content);
+
+        if (sender === "bot" && emotion) {
+          const metaRow = document.createElement("div");
+          metaRow.classList.add("meta-row");
+
+          const emotionTag = document.createElement("span");
+          emotionTag.classList.add("emotion-tag");
+          emotionTag.textContent = emotion.toLowerCase();
+
+          metaRow.appendChild(document.createTextNode("Detected mood:"));
+          metaRow.appendChild(emotionTag);
+
+          bubble.appendChild(metaRow);
+        }
+
+        row.appendChild(bubble);
+        messages.appendChild(row);
+        scrollToBottom();
+      }
+
+      function setTyping(isTyping) {
+        typing.style.visibility = isTyping ? "visible" : "hidden";
+      }
+
+      async function sendMessage() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        addMessage("user", text);
+        input.value = "";
+        input.focus();
+
+        setTyping(true);
+        sendBtn.disabled = true;
+
+        try {
+          const res = await fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text }),
+          });
+
+          const data = await res.json();
+          const botReply =
+            data.bot_reply ||
+            "I'm here with you. We can take it one small step at a time.";
+          const emotion = data.detected_emotion || null;
+
+          addMessage("bot", botReply, emotion);
+        } catch (err) {
+          addMessage(
+            "bot",
+            "Sorry, something went wrong. Could you try again in a moment?",
+          );
+        } finally {
+          setTyping(false);
+          sendBtn.disabled = false;
+        }
+      }
+
+      sendBtn.addEventListener("click", sendMessage);
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") sendMessage();
+      });
+
+      // Warm welcome
+      window.addEventListener("load", () => {
+        addMessage(
+          "bot",
+          "Hi, I’m CalmPulse. Thanks for checking in. How are you feeling today?",
+        );
+      });
+    </script>
+  </body>
+</html>
