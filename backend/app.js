@@ -1,161 +1,193 @@
+require("dotenv").config();
+
 const express = require("express");
 const bodyParser = require("body-parser");
-const { pipeline } = require("@xenova/transformers");
 const cors = require("cors");
+const axios = require("axios");
+const { pipeline } = require("@xenova/transformers");
 
 const app = express();
 app.use(bodyParser.json());
-app.use(express.static("public"));
 app.use(cors());
 
-// --- Lazy initialization ---
+// ==============================
+// 🧠 Emotion Model
+// ==============================
 let emotionClassifier = null;
-let chatbot = null;
 
 async function loadModels() {
-  console.log("\n🔄 Loading models... (this may take a moment)\n");
+  console.log("🔄 Loading emotion model...");
 
-  // Emotion detection
   emotionClassifier = await pipeline(
     "text-classification",
-    "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+    "Xenova/distilbert-base-uncased-finetuned-sst-2-english"
   );
 
-  // Chat model
-  chatbot = await pipeline("text2text-generation", "Xenova/flan-t5-base");
-
-  console.log("\n✅ Models loaded successfully!\n");
+  console.log("✅ Emotion model loaded");
 }
 
-// 🧠 STRONG PROMPT (FIXED)
-function buildPrompt(userInput, emotion, personality) {
-  let role = "";
-
-  if (personality === "friendly") {
-    role = "You are a friendly best friend who speaks casually and warmly.";
-  } 
-  else if (personality === "guardian") {
-    role = "You are a protective guardian who reassures the user and makes them feel safe.";
-  } 
-  else if (personality === "mentor") {
-    role = "You are a wise mentor who gives thoughtful guidance and calm advice.";
-  }
-
-  return `
-${role}
-
-User message: ${userInput}
-Detected emotion: ${emotion}
-
-IMPORTANT RULES:
-- Always respond in character
-- Use tone matching your role
-- Be empathetic
-- Keep response short (1-2 sentences)
-- Do NOT repeat the user input
-
-Response:
-`;
-}
-
-// 🧠 Detect bad responses
-function isBadResponse(reply, userInput) {
-  const r = reply.toLowerCase();
-  const u = userInput.toLowerCase();
-
-  return (
-    !reply ||
-    reply.length < 10 ||
-    r.includes("i don't know") ||
-    r.includes("not sure") ||
-    r.includes(u) || // repeating input
-    r.includes("be calm")
-  );
-}
-
-// 🧠 Smart fallback responses (VERY IMPORTANT)
-function smartFallback(userInput, personality) {
-  const input = userInput.toLowerCase();
-
-  // 🎭 Personality first
+// ==============================
+// 🎭 Personality Style (STRONG)
+// ==============================
+function getPersonalityStyle(personality) {
   if (personality === "guardian") {
-    return "You're safe here 💙 Take your time. I'm here with you.";
+    return `
+You are a protective guardian.
+- Make the user feel safe
+- Speak calmly and reassuringly
+- Use comforting phrases like "you're safe", "I'm here"
+`;
   }
 
   if (personality === "mentor") {
-    return "Take a moment to breathe 🌿 Sometimes clarity comes when we slow down.";
+    return `
+You are a wise mentor.
+- Give thoughtful advice
+- Speak calmly and insightfully
+- Help the user reflect and grow
+`;
   }
 
-  // 🧠 Context-based
-  if (input.includes("hello") || input.includes("hi")) {
-    return "Hey 😊 I'm here for you. How are you feeling today?";
-  }
-
-  if (input.includes("exam") || input.includes("test")) {
-    return "Exams can feel stressful 💙 Take a deep breath—you’ve prepared more than you think.";
-  }
-
-  if (input.includes("stress") || input.includes("anxious")) {
-    return "I understand how overwhelming that can feel 💙 You're not alone.";
-  }
-
-  if (input.includes("sad") || input.includes("low")) {
-    return "I'm really sorry you're feeling this way 💙 Want to talk about it?";
-  }
-
-  return "I'm here for you 💙 Tell me what's been on your mind.";
+  return `
+You are a friendly best friend.
+- Speak casually and warmly
+- Be relatable and supportive
+- Use natural human tone
+`;
 }
 
-// --- Routes ---
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/public/index.html");
-});
+// ==============================
+// 🧠 Prompt Builder (STRONG)
+// ==============================
+function buildPrompt(userInput, emotion, personality) {
+  return `
+${getPersonalityStyle(personality)}
 
+User message: "${userInput}"
+Detected emotion: ${emotion}
+
+STRICT RULES:
+- Always stay in character
+- Be empathetic and human-like
+- DO NOT repeat the user input
+- Keep response 2–3 sentences
+- Respond specifically to THIS situation (no generic replies)
+
+Examples:
+
+User: I feel anxious
+Response: I understand how overwhelming that can feel 💙 You're not alone. Try taking a few slow breaths—I'm here with you.
+
+User: I have exams tomorrow
+Response: That can definitely feel stressful 💙 Just focus on doing your best—you’ve prepared more than you think.
+
+Now respond:
+`;
+}
+
+// ==============================
+// 🤖 DeepSeek via OpenRouter
+// ==============================
+async function getAIResponse(prompt) {
+  const response = await axios.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model: "deepseek/deepseek-chat",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.9,
+      top_p: 0.9,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return response.data.choices[0].message.content.trim();
+}
+
+// ==============================
+// 🎯 FORCE PERSONALITY OUTPUT
+// ==============================
+function applyPersonalityTone(text, personality) {
+  if (personality === "guardian") {
+    return "You're safe here 💙 " + text;
+  }
+
+  if (personality === "mentor") {
+    return text + " 🌿";
+  }
+
+  if (personality === "friendly") {
+    return text + " 💙";
+  }
+
+  return text;
+}
+
+// ==============================
+// 🚀 CHAT ROUTE
+// ==============================
 app.post("/chat", async (req, res) => {
   try {
-    if (!emotionClassifier || !chatbot) {
-      return res.status(500).json({ error: "Models not loaded yet." });
+    const { message, personality = "friendly" } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "No message provided" });
     }
 
-    const userInput = req.body.message;
-    const personality = req.body.personality || "friendly";
+    // 🧠 Emotion detection
+    const emotionResult = await emotionClassifier(message);
+    const emotion =
+      emotionResult[0].label === "POSITIVE" ? "positive" : "negative";
 
-    if (!userInput) {
-      return res.status(400).json({ error: "No input message provided." });
+    // 🧠 Build prompt
+    const prompt = buildPrompt(message, emotion, personality);
+
+    // 🤖 Get AI response
+    let botReply = await getAIResponse(prompt);
+
+    // 🚨 Fix bad responses (like repetition)
+    if (
+      !botReply ||
+      botReply.length < 10 ||
+      botReply.toLowerCase().includes(message.toLowerCase())
+    ) {
+      botReply = "I'm here for you 💙 Tell me what's on your mind.";
     }
 
-    // 🔍 Emotion detection
-    const emotionResult = await emotionClassifier(userInput);
-    const emotion = emotionResult[0].label;
-
-    // 🧠 Prompt
-    const prompt = buildPrompt(userInput, emotion,personality);
-
-    // 🤖 Model response
-    const response = await chatbot(prompt, {
-      max_new_tokens: 80,
-    });
-
-    let botReply = response[0].generated_text.trim();
-
-    // 🚨 Fix bad responses
-    if (isBadResponse(botReply, userInput)) {
-      botReply = smartFallback(userInput, personality);
-    }
+    // 🎭 Apply personality styling
+    botReply = applyPersonalityTone(botReply, personality);
 
     res.json({
-      user_input: userInput,
-      detected_emotion: emotion,
       bot_reply: botReply,
+      detected_emotion: emotion,
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Something went wrong." });
+
+    console.log("\n====================");
+    console.log("USER:", message);
+    console.log("PERSONALITY:", personality);
+    console.log("EMOTION:", emotion);
+    console.log("BOT:", botReply);
+    console.log("====================\n");
+
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+
+    res.status(500).json({
+      bot_reply: "I'm here for you 💙 Something went wrong, but you can try again.",
+      detected_emotion: "unknown",
+    });
   }
 });
 
-// --- Start server ---
+// ==============================
+// 🚀 START SERVER
+// ==============================
 const PORT = 3000;
+
 app.listen(PORT, async () => {
   await loadModels();
   console.log(`🚀 Server running at http://localhost:${PORT}`);
