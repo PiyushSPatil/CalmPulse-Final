@@ -14,18 +14,22 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "AI Chat", url: "/chat", icon: MessageCircle },
-  { title: "Screening", url: "/screening", icon: ClipboardList },
-  { title: "Resources", url: "/resources", icon: BookOpen },
-  { title: "Counselor", url: "/counselor", icon: Shield },
-  { title: "Admin", url: "/admin", icon: BarChart3 },
+const defaultNav = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ['student', 'counselor'] },
+  { title: "AI Chat", url: "/chat", icon: MessageCircle, roles: ['student', 'counselor'] },
+  { title: "Screening", url: "/screening", icon: ClipboardList, roles: ['student', 'counselor'] },
+  { title: "Resources", url: "/resources", icon: BookOpen, roles: ['student', 'counselor'] },
+  { title: "Counselor", url: "/counselor", icon: Shield, roles: ['counselor'] },
+  { title: "Admin", url: "/admin", icon: BarChart3, roles: ['admin'] },
 ];
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
+  const role = user?.role || 'student';
+  const navItems = defaultNav.filter((item) => item.roles.includes(role));
   const location = useLocation();
   const navigate = useNavigate();
 

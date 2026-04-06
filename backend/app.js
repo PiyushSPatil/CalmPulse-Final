@@ -2,11 +2,100 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const { pipeline } = require("@xenova/transformers");
 const cors = require("cors");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const fs = require('fs').promises;
 
 const app = express();
 app.use(bodyParser.json());
 app.use(express.static("public"));
 app.use(cors());
+
+// Accept both direct and proxied frontend requests by stripping /api if it is present.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    req.url = req.url.replace(/^\/api/, '');
+  }
+  next();
+});
+
+const USERS_FILE = './users.json';
+const COUNSELOR_EMAIL = 'counselor@calmpulse.com';
+const COUNSELOR_NAME = 'Counselor';
+const COUNSELOR_PASSWORD = 'Counselor123';
+const COUNSELOR_ROLE = 'counselor';
+
+async function loadUsers() {
+  try {
+    const data = await fs.readFile(USERS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+async function saveUsers(users) {
+  await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// Auth middleware
+function authenticate(req, res, next) {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'No token' });
+  try {
+    req.user = jwt.verify(token, 'secret');
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+// Auth routes
+const registerHandler = async (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
+  if (email === COUNSELOR_EMAIL) return res.status(400).json({ error: 'Counselor must use the counselor login portal' });
+  const users = await loadUsers();
+  if (users[email]) return res.status(400).json({ error: 'User exists' });
+  const hashed = await bcrypt.hash(password, 10);
+  const role = 'student';
+  users[email] = { name, password: hashed, role };
+  await saveUsers(users);
+  const token = jwt.sign({ email, role }, 'secret', { expiresIn: '1h' });
+  res.json({ token, user: { name, email, role } });
+};
+
+const loginHandler = async (req, res) => {
+  const { email, password } = req.body;
+  if (email === COUNSELOR_EMAIL) {
+    if (password !== COUNSELOR_PASSWORD) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = jwt.sign({ email, role: COUNSELOR_ROLE }, 'secret', { expiresIn: '1h' });
+    return res.json({ token, user: { name: COUNSELOR_NAME, email, role: COUNSELOR_ROLE } });
+  }
+
+  const users = await loadUsers();
+  const user = users[email];
+  if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ error: 'Invalid credentials' });
+  const role = user.role || 'student';
+  const token = jwt.sign({ email, role }, 'secret', { expiresIn: '1h' });
+  res.json({ token, user: { name: user.name, email, role } });
+};
+
+const profileHandler = async (req, res) => {
+  if (req.user.role === COUNSELOR_ROLE && req.user.email === COUNSELOR_EMAIL) {
+    return res.json({ name: COUNSELOR_NAME, email: COUNSELOR_EMAIL, role: COUNSELOR_ROLE });
+  }
+  const users = await loadUsers();
+  const user = users[req.user.email];
+  res.json({ name: user.name, email: req.user.email, role: user.role || 'student' });
+};
+
+app.post('/register', registerHandler);
+app.post('/api/register', registerHandler);
+app.post('/login', loginHandler);
+app.post('/api/login', loginHandler);
+app.get('/profile', authenticate, profileHandler);
+app.get('/api/profile', authenticate, profileHandler);
 
 // --- Lazy initialization ---
 let emotionClassifier = null;
@@ -111,7 +200,7 @@ app.get("/", (req, res) => {
   res.sendFile(__dirname + "/public/index.html");
 });
 
-app.post("/chat", async (req, res) => {
+const chatHandler = async (req, res) => {
   try {
     if (!emotionClassifier || !chatbot) {
       return res.status(500).json({ error: "Models not loaded yet." });
@@ -129,7 +218,7 @@ app.post("/chat", async (req, res) => {
     const emotion = emotionResult[0].label;
 
     // 🧠 Prompt
-    const prompt = buildPrompt(userInput, emotion,personality);
+    const prompt = buildPrompt(userInput, emotion, personality);
 
     // 🤖 Model response
     const response = await chatbot(prompt, {
@@ -152,7 +241,10 @@ app.post("/chat", async (req, res) => {
     console.error(error);
     res.status(500).json({ error: "Something went wrong." });
   }
-});
+};
+
+app.post("/chat", chatHandler);
+app.post("/api/chat", chatHandler);
 
 // --- Start server ---
 const PORT = 3000;
