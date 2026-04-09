@@ -4,7 +4,7 @@ const { pipeline } = require("@xenova/transformers");
 const cors = require("cors");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const fs = require('fs').promises;
+const { MongoClient } = require('mongodb');
 
 const app = express();
 app.use(bodyParser.json());
@@ -19,23 +19,29 @@ app.use((req, res, next) => {
   next();
 });
 
-const USERS_FILE = './users.json';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
+const DB_NAME = process.env.DB_NAME || 'calmpulse';
 const COUNSELOR_EMAIL = 'counselor@calmpulse.com';
 const COUNSELOR_NAME = 'Counselor';
 const COUNSELOR_PASSWORD = 'Counselor123';
 const COUNSELOR_ROLE = 'counselor';
+let usersCollection;
 
-async function loadUsers() {
-  try {
-    const data = await fs.readFile(USERS_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch {
-    return {};
-  }
+async function connectDb() {
+  const client = new MongoClient(MONGO_URI);
+  await client.connect();
+  const db = client.db(DB_NAME);
+  usersCollection = db.collection('users');
+  await usersCollection.createIndex({ email: 1 }, { unique: true });
+  console.log(`Connected to MongoDB at ${MONGO_URI}, using database "${DB_NAME}"`);
 }
 
-async function saveUsers(users) {
-  await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+async function getUserByEmail(email) {
+  return usersCollection && (await usersCollection.findOne({ email }));
+}
+
+async function createUser(user) {
+  return await usersCollection.insertOne(user);
 }
 
 // Auth middleware
@@ -55,12 +61,23 @@ const registerHandler = async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
   if (email === COUNSELOR_EMAIL) return res.status(400).json({ error: 'Counselor must use the counselor login portal' });
-  const users = await loadUsers();
-  if (users[email]) return res.status(400).json({ error: 'User exists' });
+
+  const existingUser = await getUserByEmail(email);
+  if (existingUser) return res.status(400).json({ error: 'User exists' });
+
   const hashed = await bcrypt.hash(password, 10);
   const role = 'student';
-  users[email] = { name, password: hashed, role };
-  await saveUsers(users);
+
+  try {
+    await createUser({ name, email, password: hashed, role });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'User exists' });
+    }
+    console.error('Error saving user:', error);
+    return res.status(500).json({ error: 'Unable to register user' });
+  }
+
   const token = jwt.sign({ email, role }, 'secret', { expiresIn: '1h' });
   res.json({ token, user: { name, email, role } });
 };
@@ -73,8 +90,7 @@ const loginHandler = async (req, res) => {
     return res.json({ token, user: { name: COUNSELOR_NAME, email, role: COUNSELOR_ROLE } });
   }
 
-  const users = await loadUsers();
-  const user = users[email];
+  const user = await getUserByEmail(email);
   if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ error: 'Invalid credentials' });
   const role = user.role || 'student';
   const token = jwt.sign({ email, role }, 'secret', { expiresIn: '1h' });
@@ -85,8 +101,9 @@ const profileHandler = async (req, res) => {
   if (req.user.role === COUNSELOR_ROLE && req.user.email === COUNSELOR_EMAIL) {
     return res.json({ name: COUNSELOR_NAME, email: COUNSELOR_EMAIL, role: COUNSELOR_ROLE });
   }
-  const users = await loadUsers();
-  const user = users[req.user.email];
+
+  const user = await getUserByEmail(req.user.email);
+  if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ name: user.name, email: req.user.email, role: user.role || 'student' });
 };
 
@@ -249,6 +266,12 @@ app.post("/api/chat", chatHandler);
 // --- Start server ---
 const PORT = 3000;
 app.listen(PORT, async () => {
-  await loadModels();
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+  try {
+    await connectDb();
+    await loadModels();
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 });

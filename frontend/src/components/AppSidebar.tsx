@@ -6,6 +6,7 @@ import {
   ClipboardList,
   BookOpen,
   LogIn,
+  LogOut,
   Heart,
   Menu,
   X,
@@ -27,7 +28,7 @@ const defaultNav = [
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const role = user?.role || 'student';
   const navItems = defaultNav.filter((item) => item.roles.includes(role));
   const location = useLocation();
@@ -97,14 +98,27 @@ export function AppSidebar() {
 
         {/* Bottom */}
         <div className="px-2 pb-4">
-          <NavLink
-            to="/login"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            activeClassName="bg-primary/10 text-primary"
-          >
-            <LogIn className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>Login</span>}
-          </NavLink>
+          {user ? (
+            <button
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all text-left"
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>Logout</span>}
+            </button>
+          ) : (
+            <NavLink
+              to="/login"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              activeClassName="bg-primary/10 text-primary"
+            >
+              <LogIn className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>Login</span>}
+            </NavLink>
+          )}
         </div>
 
         {/* Desktop collapse toggle */}
