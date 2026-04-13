@@ -70,7 +70,22 @@ async function getAllScreenings() {
   return await screeningsCollection.find().sort({ createdAt: -1 }).toArray();
 }
 
+async function getAllChats() {
+  if (!chatsCollection) return [];
+  return await chatsCollection.find().sort({ createdAt: -1 }).toArray();
+}
+
 // Auth middleware
+function authenticate(req, res, next) {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'No token' });
+  try {
+    req.user = jwt.verify(token, 'secret');
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
 function authenticate(req, res, next) {
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'No token' });
@@ -145,6 +160,43 @@ const getScreeningsHandler = async (req, res) => {
   } catch (error) {
     console.error('Failed to load screening history:', error);
     res.status(500).json({ error: 'Unable to load screening history' });
+  }
+};
+
+const getCounselorReportHandler = async (req, res) => {
+  try {
+    if (req.user.role !== COUNSELOR_ROLE || req.user.email !== COUNSELOR_EMAIL) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const screenings = await getAllScreenings();
+    const chats = await getAllChats();
+
+    // Aggregate screenings by risk level
+    const report = {
+      totalScreenings: screenings.length,
+      riskLevels: {
+        low: screenings.filter(s => s.result === 'low').length,
+        moderate: screenings.filter(s => s.result === 'moderate').length,
+        high: screenings.filter(s => s.result === 'high').length,
+      },
+      recentActivity: screenings.slice(0, 10).map(s => ({
+        userEmail: s.userEmail,
+        result: s.result,
+        average: s.average,
+        createdAt: s.createdAt,
+      })),
+      recentChats: chats.slice(0, 10).map(c => ({
+        userEmail: c.userEmail,
+        userInput: c.userInput,
+        createdAt: c.createdAt,
+      })),
+    };
+
+    res.json({ report });
+  } catch (error) {
+    console.error('Failed to generate counselor report:', error);
+    res.status(500).json({ error: 'Unable to generate report' });
   }
 };
 
@@ -350,6 +402,8 @@ app.post('/screening-result', authenticate, saveScreeningHandler);
 app.post('/api/screening-result', authenticate, saveScreeningHandler);
 app.get('/screenings', authenticate, getScreeningsHandler);
 app.get('/api/screenings', authenticate, getScreeningsHandler);
+app.get('/counselor-report', authenticate, getCounselorReportHandler);
+app.get('/api/counselor-report', authenticate, getCounselorReportHandler);
 
 // --- Start server ---
 const PORT = 3000;
