@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 const defaultNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ['student', 'counselor'] },

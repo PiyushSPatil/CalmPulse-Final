@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ClipboardList, ChevronRight, AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ClipboardList, ChevronRight, AlertTriangle, CheckCircle, AlertCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CrisisAlert } from "@/components/CrisisAlert";
+import { useAuth } from "@/hooks/useAuth";
 
 const questions = [
   { q: "How often have you felt nervous or anxious in the past 2 weeks?", options: ["Not at all", "Several days", "More than half the days", "Nearly every day"] },
@@ -24,6 +26,8 @@ export default function Screening() {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [result, setResult] = useState<RiskLevel | null>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleAnswer = (score: number) => {
     const newAnswers = [...answers, score];
@@ -56,20 +60,58 @@ export default function Screening() {
 
       <AnimatePresence mode="wait">
         {result ? (
-          <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
-            {/* Result card */}
-            <div className="glass rounded-2xl p-6 text-center space-y-4">
-              <div className={`w-16 h-16 rounded-2xl ${riskConfig[result].bg} flex items-center justify-center mx-auto`}>
-                {(() => { const Icon = riskConfig[result].icon; return <Icon className={`w-8 h-8 ${riskConfig[result].color}`} />; })()}
+          !user ? (
+            // Login prompt for viewing results
+            <motion.div key="login" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              <div className="glass rounded-2xl p-8 text-center space-y-6">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                  <Lock className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground mb-2">View Your Results</h2>
+                  <p className="text-sm text-muted-foreground">Sign in to view your screening results and get personalized recommendations based on your answers.</p>
+                </div>
+                <div className="space-y-3">
+                  <Button 
+                    onClick={() => navigate("/login")}
+                    className="w-full rounded-xl"
+                  >
+                    Sign In
+                  </Button>
+                  <Button 
+                    onClick={() => navigate("/register")}
+                    variant="outline"
+                    className="w-full rounded-xl"
+                  >
+                    Create Account
+                  </Button>
+                </div>
+                <Button 
+                  onClick={() => { setCurrent(0); setAnswers([]); setResult(null); }}
+                  variant="ghost"
+                  className="w-full rounded-xl"
+                >
+                  Retake Screening
+                </Button>
               </div>
-              <h2 className="text-xl font-bold text-foreground">{riskConfig[result].label}</h2>
-              <p className="text-sm text-muted-foreground">{riskConfig[result].desc}</p>
-              <Button variant="outline" className="rounded-xl" onClick={() => { setCurrent(0); setAnswers([]); setResult(null); }}>
-                Retake Screening
-              </Button>
-            </div>
-            {result === "high" && <CrisisAlert />}
-          </motion.div>
+            </motion.div>
+          ) : (
+            // Result display for logged-in users
+            <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+              {/* Result card */}
+              <div className="glass rounded-2xl p-6 text-center space-y-4">
+                <div className={`w-16 h-16 rounded-2xl ${riskConfig[result].bg} flex items-center justify-center mx-auto`}>
+                  {(() => { const Icon = riskConfig[result].icon; return <Icon className={`w-8 h-8 ${riskConfig[result].color}`} />; })()}
+                </div>
+                <h2 className="text-xl font-bold text-foreground">{riskConfig[result].label}</h2>
+                <p className="text-sm text-muted-foreground">{riskConfig[result].desc}</p>
+                <Button variant="outline" className="rounded-xl" onClick={() => { setCurrent(0); setAnswers([]); setResult(null); }}>
+                  Retake Screening
+                </Button>
+              </div>
+              {result === "high" && <CrisisAlert />}
+            </motion.div>
+          )
         ) : (
           <motion.div key={current} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="glass rounded-2xl p-6 space-y-4">
             <h2 className="text-lg font-semibold text-foreground">{questions[current].q}</h2>

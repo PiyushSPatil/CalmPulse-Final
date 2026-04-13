@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Heart, Mail, Lock, User, ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -62,7 +62,7 @@ export default function Login() {
             </div>
           </div>
           {error && <p className="text-red-500 text-sm">{error}</p>}
-          <p className="text-xs text-muted-foreground">Counselor login: counselor@calmpulse.com / Counselor123</p>
+          {/* <p className="text-xs text-muted-foreground">Counselor login: counselor@calmpulse.com / Counselor123</p> */}
           <Button type="submit" className="w-full rounded-xl gap-2" size="lg">
             Sign In <ArrowRight className="w-4 h-4" />
           </Button>

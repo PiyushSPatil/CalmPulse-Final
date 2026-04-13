@@ -3,7 +3,7 @@ import { AlertTriangle, MessageCircle, User, Shield, Clock, ChevronRight, Search
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 const flaggedStudents = [
   { id: 1, name: "Alex M.", risk: "High", lastActive: "2 mins ago", mood: "😰", reason: "Expressed feelings of hopelessness", messages: 23, unread: 3, status: "active", resolvedToday: false },

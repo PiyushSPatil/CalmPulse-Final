@@ -1,18 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-interface User {
-  name: string;
-  email: string;
-  role: 'student' | 'counselor' | string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { useState, useEffect, ReactNode } from 'react';
+import { AuthContext } from '@/contexts/AuthContextDefinition';
+import type { User } from '@/contexts/AuthContextDefinition';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -28,12 +16,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = (token: string, user: User) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
+    // Clear the unauthenticated chat counter when user logs in
+    localStorage.removeItem('unauthedChatCount');
     setUser(user);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    // Reset the unauthenticated chat counter on logout
+    localStorage.removeItem('unauthedChatCount');
     setUser(null);
   };
 
@@ -42,10 +34,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
 };

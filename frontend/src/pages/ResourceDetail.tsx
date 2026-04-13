@@ -1,7 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const resources = [
   {
@@ -89,8 +91,20 @@ function getYouTubeEmbedUrl(videoUrl: string) {
 export default function ResourceDetail() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const resource = resources.find(r => r.slug === slug);
   const embedUrl = resource?.videoUrl ? getYouTubeEmbedUrl(resource.videoUrl) : null;
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/login", { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Redirect in progress, don't render
+  if (!user) {
+    return null;
+  }
 
   if (!resource) {
     return <div>Resource not found</div>;

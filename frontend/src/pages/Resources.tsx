@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Wind, Brain, Heart, Dumbbell, Music, Leaf } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const resources = [
   { 
@@ -60,6 +62,18 @@ const fadeUp = {
 
 export default function Resources() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/login", { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Redirect in progress, don't render
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
