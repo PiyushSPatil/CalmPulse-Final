@@ -41,6 +41,24 @@ export default function Screening() {
     }
   };
 
+  useEffect(() => {
+    if (!result || !user) return;
+
+    const average = answers.reduce((a, b) => a + b, 0) / questions.length;
+    const token = localStorage.getItem("token");
+
+    fetch('/api/screening-result', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ answers, result, average }),
+    }).catch((error) => {
+      console.error('Failed to save screening result:', error);
+    });
+  }, [result, user, answers]);
+
   const progress = ((result ? questions.length : current) / questions.length) * 100;
 
   return (

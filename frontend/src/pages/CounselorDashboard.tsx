@@ -2,45 +2,14 @@ import { motion } from "framer-motion";
 import { AlertTriangle, MessageCircle, User, Shield, Clock, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-
-const flaggedStudents = [
-  { id: 1, name: "Alex M.", risk: "High", lastActive: "2 mins ago", mood: "😰", reason: "Expressed feelings of hopelessness", messages: 23, unread: 3, status: "active", resolvedToday: false },
-  { id: 2, name: "Jordan K.", risk: "High", lastActive: "15 mins ago", mood: "😔", reason: "Screening score above threshold", messages: 45, unread: 1, status: "active", resolvedToday: false },
-  { id: 3, name: "Sam R.", risk: "Moderate", lastActive: "1 hour ago", mood: "😐", reason: "Declining mood pattern over 5 days", messages: 18, unread: 0, status: "active", resolvedToday: false },
-  { id: 4, name: "Taylor P.", risk: "Moderate", lastActive: "3 hours ago", mood: "😟", reason: "Reported sleep issues and stress", messages: 12, unread: 0, status: "active", resolvedToday: false },
-  { id: 5, name: "Morgan L.", risk: "Low", lastActive: "1 day ago", mood: "😊", reason: "Follow-up from previous session", messages: 31, unread: 0, status: "active", resolvedToday: false },
-];
 
 type ChatMessage = {
   sender: "student" | "counselor" | "ai";
   text: string;
   time: string;
-};
-
-const initialMessagesByStudent: Record<number, ChatMessage[]> = {
-  1: [
-    { sender: "student", text: "Not great... I feel like nothing matters anymore.", time: "10:01 AM" },
-    { sender: "ai", text: "I hear you, and I want you to know that your feelings are valid. Can you tell me more about what's been going on?", time: "10:01 AM" },
-    { sender: "student", text: "School is overwhelming and I can't sleep.", time: "10:03 AM" },
-  ],
-  2: [
-    { sender: "student", text: "I'm really anxious about my exams.", time: "09:40 AM" },
-    { sender: "ai", text: "Your prep matters, but it also matters to rest. Would you like a short breathing exercise?", time: "09:41 AM" },
-  ],
-  3: [
-    { sender: "student", text: "I feel stuck in a loop of bad days.", time: "08:20 AM" },
-    { sender: "ai", text: "It's okay to ask for help. You're doing well by checking in.", time: "08:21 AM" },
-  ],
-  4: [
-    { sender: "student", text: "I'm losing motivation to do anything.", time: "11:22 AM" },
-    { sender: "ai", text: "Small steps are still progress. Would you like to talk through one thing at a time?", time: "11:23 AM" },
-  ],
-  5: [
-    { sender: "student", text: "I feel much better after the last session.", time: "07:30 AM" },
-    { sender: "ai", text: "I'm glad to hear that. Keep checking in with yourself.", time: "07:31 AM" },
-  ],
 };
 
 const riskColor = (risk: string) => {
@@ -49,14 +18,117 @@ const riskColor = (risk: string) => {
   return "bg-soft-green text-soft-green-foreground";
 };
 
+type ScreeningRecord = {
+  _id: string;
+  userEmail: string;
+  result: string;
+  average: number;
+  answers: number[];
+  createdAt: string;
+};
+
+type ReportData = {
+  totalScreenings: number;
+  riskLevels: {
+    low: number;
+    moderate: number;
+    high: number;
+  };
+  recentActivity: ScreeningRecord[];
+  recentChats: {
+    userEmail: string;
+    userInput: string;
+    createdAt: string;
+  }[];
+};
+
 export default function CounselorDashboard() {
   const { user } = useAuth();
-  const [students, setStudents] = useState(flaggedStudents);
-  const [selectedId, setSelectedId] = useState(flaggedStudents[0]?.id ?? null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [messageInput, setMessageInput] = useState("");
-  const [messagesByStudent, setMessagesByStudent] = useState<Record<number, ChatMessage[]>>(initialMessagesByStudent);
+  const [messagesByStudent, setMessagesByStudent] = useState<Record<string, ChatMessage[]>>({});
+  const [screenings, setScreenings] = useState<ScreeningRecord[]>([]);
+  const [loadingScreenings, setLoadingScreenings] = useState(true);
+  const [selectedScreening, setSelectedScreening] = useState<ScreeningRecord | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [report, setReport] = useState<ReportData | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
+
+  const openDetails = (screening: ScreeningRecord) => {
+    setSelectedScreening(screening);
+    setIsDetailsOpen(true);
+  };
+
+  const fetchReport = async () => {
+    if (!user || user.role !== 'counselor') return;
+    setLoadingReport(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/counselor-report', {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReport(data.report);
+      }
+    } catch (error) {
+      console.error('Failed to load report:', error);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchScreenings = async () => {
+      if (!user || user.role !== 'counselor') return;
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/screenings', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setScreenings(data.screenings || []);
+          // Generate dynamic students from screenings
+          const uniqueEmails = [...new Set(data.screenings.map((s: ScreeningRecord) => s.userEmail))];
+          const dynamicStudents = uniqueEmails.map((email, index) => {
+            const userScreenings = data.screenings.filter((s: ScreeningRecord) => s.userEmail === email);
+            const latestScreening = userScreenings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+            const risk = latestScreening.result === 'high' ? 'High' : latestScreening.result === 'moderate' ? 'Moderate' : 'Low';
+            return {
+              id: email,
+              name: email.split('@')[0],
+              risk,
+              lastActive: new Date(latestScreening.createdAt).toLocaleString(),
+              mood: risk === 'High' ? '😰' : risk === 'Moderate' ? '😟' : '😊',
+              reason: `Latest screening: ${risk} risk`,
+              messages: userScreenings.length,
+              unread: 0,
+              status: 'active',
+              resolvedToday: false,
+            };
+          });
+          setStudents(dynamicStudents);
+          if (dynamicStudents.length > 0 && !selectedId) {
+            setSelectedId(dynamicStudents[0].id);
+          }
+        console.error('Failed to load screening history:', error);
+      } finally {
+        setLoadingScreenings(false);
+      }
+    };
+    fetchScreenings();
+    fetchReport();
+  }, [user]);
 
   const selectedStudent = students.find((s) => s.id === selectedId) ?? students[0] ?? null;
 
@@ -150,6 +222,60 @@ export default function CounselorDashboard() {
         ))}
       </div>
 
+      {/* Report Section */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground">Final Report</h2>
+          <Button onClick={fetchReport} disabled={loadingReport} className="rounded-xl">
+            {loadingReport ? "Generating..." : "Generate Report"}
+          </Button>
+        </div>
+        {report ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground">{report.totalScreenings}</p>
+                <p className="text-xs text-muted-foreground">Total Screenings</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">{report.riskLevels.low}</p>
+                <p className="text-xs text-muted-foreground">Low Risk</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-yellow-600">{report.riskLevels.moderate}</p>
+                <p className="text-xs text-muted-foreground">Moderate Risk</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-600">{report.riskLevels.high}</p>
+                <p className="text-xs text-muted-foreground">High Risk</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">Recent Activity</h3>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {report.recentActivity.slice(0, 5).map((activity, i) => (
+                  <div key={i} className="text-xs text-muted-foreground">
+                    {activity.userEmail} - {activity.result} risk ({new Date(activity.createdAt).toLocaleString()})
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">Recent Chats</h3>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {report.recentChats.slice(0, 5).map((chat, i) => (
+                  <div key={i} className="text-xs text-muted-foreground">
+                    {chat.userEmail}: {chat.userInput.substring(0, 50)}... ({new Date(chat.createdAt).toLocaleString()})
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Click "Generate Report" to view summary.</p>
+        )}
+      </motion.div>
+
       <div className="grid lg:grid-cols-5 gap-4">
         {/* Student List */}
         <div className="lg:col-span-2 glass rounded-2xl p-4 space-y-3">
@@ -238,6 +364,92 @@ export default function CounselorDashboard() {
               <p className="text-sm text-muted-foreground mt-2">All flagged students are resolved.</p>
             </div>
           )}
+
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" /> Screening History
+              </h4>
+              {loadingScreenings && <span className="text-xs text-muted-foreground">Loading...</span>}
+            </div>
+            {screenings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No screening history available yet.</p>
+            ) : (
+              <div className="space-y-3 overflow-x-auto">
+                <div className="min-w-[650px]">
+                  <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-4 text-xs uppercase tracking-[0.12em] text-muted-foreground border-b border-border/50 pb-2 mb-2">
+                    <span>Date</span>
+                    <span>Student</span>
+                    <span>Result</span>
+                    <span>Average</span>
+                    <span>Action</span>
+                  </div>
+                  {screenings.slice(0, 6).map((screening) => (
+                    <div key={screening._id} className="grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-4 py-3 border-b border-border/20 text-sm text-foreground items-center">
+                      <span>{new Date(screening.createdAt).toLocaleString()}</span>
+                      <span className="truncate text-muted-foreground">{screening.userEmail}</span>
+                      <span className="font-medium capitalize">{screening.result}</span>
+                      <span>{screening.average.toFixed(2)}</span>
+                      <Button size="sm" variant="outline" onClick={() => openDetails(screening)} className="rounded-xl">
+                        View details
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Screening details</DialogTitle>
+                <DialogDescription>Review the saved answers and summary for this screening.</DialogDescription>
+              </DialogHeader>
+              {selectedScreening ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Student email</p>
+                      <p className="text-sm text-foreground">{selectedScreening.userEmail}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Result</p>
+                      <p className="text-sm font-medium text-foreground capitalize">{selectedScreening.result}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Average score</p>
+                      <p className="text-sm text-foreground">{selectedScreening.average.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Submitted</p>
+                      <p className="text-sm text-foreground">{new Date(selectedScreening.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Answers</p>
+                    <div className="space-y-2 rounded-2xl bg-muted/50 p-4">
+                      {selectedScreening.answers.map((answer, index) => (
+                        <div key={index} className="flex items-center justify-between rounded-xl border border-border/50 bg-background px-3 py-2 text-sm">
+                          <span>Question {index + 1}</span>
+                          <strong>{answer}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Select a screening entry to view details.</p>
+              )}
+              <DialogFooter>
+                <Button type="button" onClick={() => setIsDetailsOpen(false)} className="rounded-xl">
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Chat history */}
           <div className="glass rounded-2xl p-4">
