@@ -1,6 +1,12 @@
 import { Smile, Meh, Frown, Heart, Angry } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+
+interface MoodSelectorProps {
+  selectedMood?: number | null;
+  onSelect?: (index: number) => void;
+  readOnly?: boolean;
+}
 
 const moods = [
   { icon: Angry, label: "Awful", color: "text-soft-rose-foreground bg-soft-rose" },
@@ -10,8 +16,12 @@ const moods = [
   { icon: Heart, label: "Great", color: "text-soft-green-foreground bg-soft-green" },
 ];
 
-export function MoodSelector() {
-  const [selected, setSelected] = useState<number | null>(null);
+export function MoodSelector({ selectedMood = null, onSelect, readOnly = false }: MoodSelectorProps) {
+  const [selected, setSelected] = useState<number | null>(selectedMood);
+
+  useEffect(() => {
+    setSelected(selectedMood ?? null);
+  }, [selectedMood]);
 
   return (
     <div className="flex gap-3 justify-center">
@@ -20,10 +30,14 @@ export function MoodSelector() {
           key={mood.label}
           whileHover={{ scale: 1.15 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setSelected(i)}
+          onClick={() => {
+            if (readOnly) return;
+            setSelected(i);
+            onSelect?.(i);
+          }}
           className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all duration-200 ${
             selected === i ? mood.color + " shadow-soft ring-2 ring-primary/20" : "hover:bg-muted"
-          }`}
+          } ${readOnly ? "cursor-default opacity-90" : "cursor-pointer"}`}
         >
           <mood.icon className="w-7 h-7" />
           <span className="text-xs font-medium">{mood.label}</span>

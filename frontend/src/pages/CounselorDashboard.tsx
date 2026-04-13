@@ -2,7 +2,8 @@ import { motion } from "framer-motion";
 import { AlertTriangle, MessageCircle, User, Shield, Clock, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 
 const flaggedStudents = [
@@ -49,6 +50,15 @@ const riskColor = (risk: string) => {
   return "bg-soft-green text-soft-green-foreground";
 };
 
+type ScreeningRecord = {
+  _id: string;
+  userEmail: string;
+  result: string;
+  average: number;
+  answers: number[];
+  createdAt: string;
+};
+
 export default function CounselorDashboard() {
   const { user } = useAuth();
   const [students, setStudents] = useState(flaggedStudents);
@@ -57,6 +67,39 @@ export default function CounselorDashboard() {
   const [actionMessage, setActionMessage] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [messagesByStudent, setMessagesByStudent] = useState<Record<number, ChatMessage[]>>(initialMessagesByStudent);
+  const [screenings, setScreenings] = useState<ScreeningRecord[]>([]);
+  const [loadingScreenings, setLoadingScreenings] = useState(true);
+  const [selectedScreening, setSelectedScreening] = useState<ScreeningRecord | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  const openDetails = (screening: ScreeningRecord) => {
+    setSelectedScreening(screening);
+    setIsDetailsOpen(true);
+  };
+
+  useEffect(() => {
+    const fetchScreenings = async () => {
+      if (!user || user.role !== 'counselor') return;
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/screenings', {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setScreenings(data.screenings || []);
+        }
+      } catch (error) {
+        console.error('Failed to load screening history:', error);
+      } finally {
+        setLoadingScreenings(false);
+      }
+    };
+    fetchScreenings();
+  }, [user]);
 
   const selectedStudent = students.find((s) => s.id === selectedId) ?? students[0] ?? null;
 
@@ -238,6 +281,92 @@ export default function CounselorDashboard() {
               <p className="text-sm text-muted-foreground mt-2">All flagged students are resolved.</p>
             </div>
           )}
+
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Shield className="w-4 h-4 text-primary" /> Screening History
+              </h4>
+              {loadingScreenings && <span className="text-xs text-muted-foreground">Loading...</span>}
+            </div>
+            {screenings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No screening history available yet.</p>
+            ) : (
+              <div className="space-y-3 overflow-x-auto">
+                <div className="min-w-[650px]">
+                  <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-4 text-xs uppercase tracking-[0.12em] text-muted-foreground border-b border-border/50 pb-2 mb-2">
+                    <span>Date</span>
+                    <span>Student</span>
+                    <span>Result</span>
+                    <span>Average</span>
+                    <span>Action</span>
+                  </div>
+                  {screenings.slice(0, 6).map((screening) => (
+                    <div key={screening._id} className="grid grid-cols-[1.5fr_1fr_1fr_1fr_auto] gap-4 py-3 border-b border-border/20 text-sm text-foreground items-center">
+                      <span>{new Date(screening.createdAt).toLocaleString()}</span>
+                      <span className="truncate text-muted-foreground">{screening.userEmail}</span>
+                      <span className="font-medium capitalize">{screening.result}</span>
+                      <span>{screening.average.toFixed(2)}</span>
+                      <Button size="sm" variant="outline" onClick={() => openDetails(screening)} className="rounded-xl">
+                        View details
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Screening details</DialogTitle>
+                <DialogDescription>Review the saved answers and summary for this screening.</DialogDescription>
+              </DialogHeader>
+              {selectedScreening ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Student email</p>
+                      <p className="text-sm text-foreground">{selectedScreening.userEmail}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Result</p>
+                      <p className="text-sm font-medium text-foreground capitalize">{selectedScreening.result}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Average score</p>
+                      <p className="text-sm text-foreground">{selectedScreening.average.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Submitted</p>
+                      <p className="text-sm text-foreground">{new Date(selectedScreening.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Answers</p>
+                    <div className="space-y-2 rounded-2xl bg-muted/50 p-4">
+                      {selectedScreening.answers.map((answer, index) => (
+                        <div key={index} className="flex items-center justify-between rounded-xl border border-border/50 bg-background px-3 py-2 text-sm">
+                          <span>Question {index + 1}</span>
+                          <strong>{answer}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Select a screening entry to view details.</p>
+              )}
+              <DialogFooter>
+                <Button type="button" onClick={() => setIsDetailsOpen(false)} className="rounded-xl">
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Chat history */}
           <div className="glass rounded-2xl p-4">

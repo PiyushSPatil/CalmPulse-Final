@@ -26,13 +26,19 @@ const COUNSELOR_NAME = 'Counselor';
 const COUNSELOR_PASSWORD = 'Counselor123';
 const COUNSELOR_ROLE = 'counselor';
 let usersCollection;
+let chatsCollection;
+let screeningsCollection;
 
 async function connectDb() {
   const client = new MongoClient(MONGO_URI);
   await client.connect();
   const db = client.db(DB_NAME);
   usersCollection = db.collection('users');
+  chatsCollection = db.collection('chats');
+  screeningsCollection = db.collection('screenings');
   await usersCollection.createIndex({ email: 1 }, { unique: true });
+  await chatsCollection.createIndex({ userEmail: 1 });
+  await screeningsCollection.createIndex({ userEmail: 1 });
   console.log(`Connected to MongoDB at ${MONGO_URI}, using database "${DB_NAME}"`);
 }
 
@@ -42,6 +48,26 @@ async function getUserByEmail(email) {
 
 async function createUser(user) {
   return await usersCollection.insertOne(user);
+}
+
+async function saveChatLog(log) {
+  if (!chatsCollection) return null;
+  return await chatsCollection.insertOne(log);
+}
+
+async function saveScreeningResult(result) {
+  if (!screeningsCollection) return null;
+  return await screeningsCollection.insertOne(result);
+}
+
+async function getScreeningsByEmail(email) {
+  if (!screeningsCollection) return [];
+  return await screeningsCollection.find({ userEmail: email }).sort({ createdAt: -1 }).toArray();
+}
+
+async function getAllScreenings() {
+  if (!screeningsCollection) return [];
+  return await screeningsCollection.find().sort({ createdAt: -1 }).toArray();
 }
 
 // Auth middleware
@@ -105,6 +131,21 @@ const profileHandler = async (req, res) => {
   const user = await getUserByEmail(req.user.email);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ name: user.name, email: req.user.email, role: user.role || 'student' });
+};
+
+const getScreeningsHandler = async (req, res) => {
+  try {
+    if (req.user.role === COUNSELOR_ROLE && req.user.email === COUNSELOR_EMAIL) {
+      const screenings = await getAllScreenings();
+      return res.json({ screenings });
+    }
+
+    const screenings = await getScreeningsByEmail(req.user.email);
+    res.json({ screenings });
+  } catch (error) {
+    console.error('Failed to load screening history:', error);
+    res.status(500).json({ error: 'Unable to load screening history' });
+  }
 };
 
 app.post('/register', registerHandler);
@@ -249,6 +290,28 @@ const chatHandler = async (req, res) => {
       botReply = smartFallback(userInput, personality);
     }
 
+    const authHeader = req.header('Authorization')?.replace('Bearer ', '');
+    let userEmail = null;
+    if (authHeader) {
+      try {
+        const decoded = jwt.verify(authHeader, 'secret');
+        userEmail = decoded.email;
+      } catch (err) {
+        userEmail = null;
+      }
+    }
+
+    if (userEmail) {
+      await saveChatLog({
+        userEmail,
+        userInput,
+        botReply,
+        emotion,
+        personality,
+        createdAt: new Date(),
+      });
+    }
+
     res.json({
       user_input: userInput,
       detected_emotion: emotion,
@@ -260,8 +323,33 @@ const chatHandler = async (req, res) => {
   }
 };
 
+const saveScreeningHandler = async (req, res) => {
+  const { answers, result, average } = req.body;
+  if (!answers || !result || typeof average !== 'number') {
+    return res.status(400).json({ error: 'answers, result, and average are required' });
+  }
+
+  try {
+    await saveScreeningResult({
+      userEmail: req.user.email,
+      answers,
+      result,
+      average,
+      createdAt: new Date(),
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to save screening result:', error);
+    res.status(500).json({ error: 'Unable to save screening result' });
+  }
+};
+
 app.post("/chat", chatHandler);
 app.post("/api/chat", chatHandler);
+app.post('/screening-result', authenticate, saveScreeningHandler);
+app.post('/api/screening-result', authenticate, saveScreeningHandler);
+app.get('/screenings', authenticate, getScreeningsHandler);
+app.get('/api/screenings', authenticate, getScreeningsHandler);
 
 // --- Start server ---
 const PORT = 3000;
