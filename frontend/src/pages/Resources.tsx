@@ -1,13 +1,58 @@
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Wind, Brain, Heart, Dumbbell, Music, Leaf } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const resources = [
-  { icon: Wind, title: "Box Breathing", desc: "A simple 4-4-4-4 technique to calm your nervous system in seconds.", category: "Breathing", color: "bg-calm-blue text-calm-blue-foreground" },
-  { icon: Brain, title: "Grounding Exercise", desc: "5-4-3-2-1 sensory exercise to bring you back to the present moment.", category: "Mindfulness", color: "bg-lavender text-lavender-foreground" },
-  { icon: Heart, title: "Self-Compassion Journal", desc: "Write three kind things to yourself to build emotional resilience.", category: "Journaling", color: "bg-soft-rose text-soft-rose-foreground" },
-  { icon: Dumbbell, title: "Desk Stretches", desc: "Quick 5-minute stretch routine to release tension during study sessions.", category: "Physical", color: "bg-soft-green text-soft-green-foreground" },
-  { icon: Music, title: "Calm Playlist", desc: "Curated lo-fi and nature sounds to help you focus and relax.", category: "Audio", color: "bg-warm-amber text-warm-amber-foreground" },
-  { icon: Leaf, title: "Progressive Relaxation", desc: "Tense and release each muscle group to melt away physical stress.", category: "Relaxation", color: "bg-calm-blue text-calm-blue-foreground" },
+  { 
+    icon: Wind, 
+    title: "Box Breathing", 
+    desc: "A simple 4-4-4-4 technique to calm your nervous system in seconds.", 
+    category: "Breathing", 
+    color: "bg-calm-blue text-calm-blue-foreground",
+    slug: "box-breathing"
+  },
+  { 
+    icon: Brain, 
+    title: "Grounding Exercise", 
+    desc: "5-4-3-2-1 sensory exercise to bring you back to the present moment.", 
+    category: "Mindfulness", 
+    color: "bg-lavender text-lavender-foreground",
+    slug: "grounding-exercise"
+  },
+  { 
+    icon: Heart, 
+    title: "Self-Compassion Journal", 
+    desc: "Write three kind things to yourself to build emotional resilience.", 
+    category: "Journaling", 
+    color: "bg-soft-rose text-soft-rose-foreground",
+    slug: "self-compassion-journal"
+  },
+  { 
+    icon: Dumbbell, 
+    title: "Desk Stretches", 
+    desc: "Quick 5-minute stretch routine to release tension during study sessions.", 
+    category: "Physical", 
+    color: "bg-soft-green text-soft-green-foreground",
+    slug: "desk-stretches"
+  },
+  { 
+    icon: Music, 
+    title: "Calm Playlist", 
+    desc: "Curated lo-fi and nature sounds to help you focus and relax.", 
+    category: "Audio", 
+    color: "bg-warm-amber text-warm-amber-foreground",
+    slug: "calm-playlist"
+  },
+  { 
+    icon: Leaf, 
+    title: "Progressive Relaxation", 
+    desc: "Tense and release each muscle group to melt away physical stress.", 
+    category: "Relaxation", 
+    color: "bg-calm-blue text-calm-blue-foreground",
+    slug: "progressive-relaxation"
+  },
 ];
 
 const fadeUp = {
@@ -16,6 +61,20 @@ const fadeUp = {
 };
 
 export default function Resources() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/login", { replace: true });
+    }
+  }, [user, navigate]);
+
+  // Redirect in progress, don't render
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -32,6 +91,7 @@ export default function Resources() {
             initial="hidden"
             animate="visible"
             className="glass rounded-2xl p-6 hover:shadow-glass transition-all duration-300 cursor-pointer group"
+            onClick={() => navigate(`/resources/${r.slug}`)}
           >
             <div className="flex items-start justify-between mb-3">
               <div className={`w-11 h-11 rounded-xl ${r.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>

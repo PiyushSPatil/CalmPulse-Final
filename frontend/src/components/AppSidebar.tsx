@@ -6,6 +6,7 @@ import {
   ClipboardList,
   BookOpen,
   LogIn,
+  LogOut,
   Heart,
   Menu,
   X,
@@ -14,18 +15,22 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
-const navItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "AI Chat", url: "/chat", icon: MessageCircle },
-  { title: "Screening", url: "/screening", icon: ClipboardList },
-  { title: "Resources", url: "/resources", icon: BookOpen },
-  { title: "Counselor", url: "/counselor", icon: Shield },
-  { title: "Admin", url: "/admin", icon: BarChart3 },
+const defaultNav = [
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ['student', 'counselor'] },
+  { title: "AI Chat", url: "/chat", icon: MessageCircle, roles: ['student', 'counselor'] },
+  { title: "Screening", url: "/screening", icon: ClipboardList, roles: ['student', 'counselor'] },
+  { title: "Resources", url: "/resources", icon: BookOpen, roles: ['student', 'counselor'] },
+  { title: "Counselor", url: "/counselor", icon: Shield, roles: ['counselor'] },
+  { title: "Admin", url: "/admin", icon: BarChart3, roles: ['admin'] },
 ];
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { user, logout } = useAuth();
+  const role = user?.role || 'student';
+  const navItems = defaultNav.filter((item) => item.roles.includes(role));
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -93,14 +98,27 @@ export function AppSidebar() {
 
         {/* Bottom */}
         <div className="px-2 pb-4">
-          <NavLink
-            to="/login"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-            activeClassName="bg-primary/10 text-primary"
-          >
-            <LogIn className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>Login</span>}
-          </NavLink>
+          {user ? (
+            <button
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all text-left"
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>Logout</span>}
+            </button>
+          ) : (
+            <NavLink
+              to="/login"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+              activeClassName="bg-primary/10 text-primary"
+            >
+              <LogIn className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>Login</span>}
+            </NavLink>
+          )}
         </div>
 
         {/* Desktop collapse toggle */}
