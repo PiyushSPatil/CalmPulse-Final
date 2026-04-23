@@ -1,149 +1,230 @@
-🧠 CalmPulse
-AI-Powered Mental Wellness Assistant
-<p align="center"> <img src="https://img.shields.io/badge/AI-RAG-blue?style=for-the-badge" /> <img src="https://img.shields.io/badge/Frontend-React-green?style=for-the-badge" /> <img src="https://img.shields.io/badge/Backend-Node.js-orange?style=for-the-badge" /> <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" /> </p>
-🌟 Overview
+# 🧠 CalmPulse – AI-Powered Mental Wellness Assistant
 
-CalmPulse is an intelligent, full-stack AI platform designed to support mental well-being through emotion-aware conversations, personalized responses, and knowledge-driven AI reasoning.
+CalmPulse is a full-stack AI-driven mental wellness platform designed to provide emotional support through intelligent conversations. It combines Natural Language Processing, Retrieval-Augmented Generation (RAG), and personalization to deliver context-aware responses.
 
-It integrates RAG (Retrieval-Augmented Generation) with NLP models to deliver context-aware and empathetic responses, making it significantly more advanced than traditional chatbots.
+---
 
-🎥 Demo
+## 🚀 Features
 
-👉 (Add your demo video link here)
-👉 (Optional: add GIF or screen recording)
+### 💬 AI Chatbot
+- Real-time conversational chatbot
+- Human-like empathetic responses
+- Designed for mental wellness support
 
-🖼️ Screenshots
-Chat Interface	Personality Selection	Counselor Dashboard
-(Add image)	(Add image)	(Add image)
-🚀 Key Features
-💬 Intelligent Chatbot
-Real-time conversation
-Human-like empathetic replies
-Supports mental wellness interaction
-🧠 Emotion Detection
-Classifies user emotion → Positive / Negative
-Uses DistilBERT-based NLP model
-Enables emotionally aware responses
-🎭 Personality-Based Interaction
+---
 
-Customize chatbot behavior:
+### 🧠 Emotion Detection
+- Detects user emotion (Positive / Negative)
+- Uses a pre-trained NLP model
+- Helps tailor responses based on mood
 
-Mode	Behavior
-😊 Friendly	Casual and comforting
-🛡️ Guardian	Protective and reassuring
-🎓 Mentor	Thoughtful and advisory
-📚 RAG (Retrieval-Augmented Generation)
-Retrieves relevant mental health knowledge dynamically
-Uses:
-FAISS (Vector Database)
-MiniLM Embeddings
-Injects retrieved context into prompts
-Produces accurate, non-generic responses
-🧠 Chat Memory
-Maintains conversation context
-Improves response continuity
-Reduces repetition
-📖 Resources Section
-Mental health guides
-Self-help content
-Coping strategies
-🧑‍⚕️ Counselor Dashboard
-Monitor user interactions
-View behavioral insights
-Helps in support analysis
-🔐 Role-Based Authentication
+---
 
-Supports:
+### 🎭 Personality-Based Interaction
+Users can choose chatbot behavior:
 
-👤 User
-🧑‍⚕️ Counselor
-🛠️ Admin
+- 😊 Friendly → casual and supportive  
+- 🛡️ Guardian → protective and reassuring  
+- 🎓 Mentor → thoughtful and advisory  
 
-Each role has controlled access levels
+---
 
-🧠 AI Pipeline
-⚙️ Tech Stack
-🌐 Frontend
-React.js
-Tailwind CSS
-🔧 Backend
-Node.js
-Express.js
-🤖 AI Models
-DistilBERT → Emotion Detection
-FLAN-T5 → Chat Generation
-📚 RAG Components
-FAISS (Vector Store)
-MiniLM Embeddings (all-MiniLM-L6-v2)
-Custom Knowledge Base
-📂 Project Structure
+### 📚 RAG (Retrieval-Augmented Generation)
+- Retrieves relevant mental health knowledge from a dataset
+- Uses FAISS vector database and embeddings
+- Injects retrieved context into prompts
+- Produces context-aware responses
+
+---
+
+### 🧠 Chat Memory
+- Maintains conversation context
+- Reduces repetition
+- Improves interaction flow
+
+---
+
+### 📖 Resources Section
+- Provides mental health guidance
+- Helps users beyond chatbot interaction
+
+---
+
+### 🧑‍⚕️ Counselor Dashboard
+- View system insights
+- Monitor user interactions
+- Helps understand behavior patterns
+
+---
+
+### 🔐 Role-Based Authentication
+Three user roles:
+
+- 👤 User → chatbot and resources  
+- 🧑‍⚕️ Counselor → dashboard access  
+- 🛠️ Admin → full system control  
+
+---
+
+## 🧠 Tech Stack
+
+### Frontend
+- React.js  
+- Tailwind CSS  
+
+### Backend
+- Node.js  
+- Express.js  
+
+### AI Models
+- DistilBERT → Emotion Detection  
+- FLAN-T5 → Chatbot  
+
+### RAG Components
+- FAISS (Vector Database)  
+- MiniLM Embeddings  
+- Custom knowledge base  
+
+---
+
+## ⚙️ System Architecture
+
+
+User Input
+↓
+Emotion Detection
+↓
+Embedding Model
+↓
+FAISS Vector Search
+↓
+Retrieve Knowledge
+↓
+Prompt Engineering
+↓
+Language Model
+↓
+Response Output
+
+
+---
+
+## 📂 Project Structure
+
+
 CalmPulse/
 │
-├── frontend/                # React frontend
-│
+├── frontend/ # React frontend
 ├── backend/
-│   ├── app.js              # Main server
-│   ├── rag.js              # RAG pipeline
-│   ├── data/
-│   │   └── mental_health.txt
-│   ├── users.json
+│ ├── app.js # Main server
+│ ├── rag.js # RAG implementation
+│ ├── data/
+│ │ └── mental_health.txt
+│ ├── users.json
 │
 └── README.md
-🛠️ Installation
-1️⃣ Clone Repository
+
+
+---
+
+## 🛠️ Installation
+
+### 1. Clone the repository
+
 git clone https://github.com/PiyushSPatil/CalmPulse-Final.git
+
 cd CalmPulse-Final
-2️⃣ Backend Setup
+
+
+---
+
+### 2. Backend Setup
+
 cd backend
 npm install
 node app.js
-3️⃣ Frontend Setup
+
+
+---
+
+### 3. Frontend Setup
+
 cd frontend
 npm install
 npm run dev
-🧪 API Usage
-POST /chat
+
+
+---
+
+## 🧪 API Usage
+
+### POST /chat
+
+Request:
+
 {
-  "message": "I feel anxious",
-  "personality": "guardian"
+"message": "I feel anxious",
+"personality": "friendly"
 }
+
+
 Response:
+
 {
-  "bot_reply": "You're safe here 💙 Take a moment to breathe slowly.",
-  "detected_emotion": "negative"
+"bot_reply": "I understand how overwhelming that can feel 💙 You're not alone.",
+"detected_emotion": "negative"
 }
-🎯 Why RAG Matters
-Without RAG	With RAG
-Generic responses	Context-aware responses
-No knowledge base	Uses stored knowledge
-Repetitive answers	Diverse, relevant replies
-📊 Project Highlights
 
-✔ Emotion-aware chatbot
-✔ Personalized AI responses
-✔ Knowledge-driven reasoning (RAG)
-✔ Full-stack architecture
-✔ Real-world mental health application
 
-🔮 Future Enhancements
-🎤 Voice interaction
-📊 Mood analytics dashboard
-☁️ Cloud deployment
-📱 Mobile app integration
-🤝 Real counselor integration
-👨‍💻 Contributors
-Piyush Patil
-Team Member 2
-Team Member 3
-📄 License
+---
 
-This project is developed for academic purposes and research exploration.
+## 🎯 Why RAG?
 
-⭐ Acknowledgements
-HuggingFace Transformers
-LangChain
-FAISS
-React & Node.js Ecosystem
-🚀 Final Note
+Without RAG:
+- Generic responses  
+- Repetitive answers  
 
-CalmPulse demonstrates how AI can be responsibly used to support mental health, combining emotional intelligence, personalization, and knowledge-based reasoning.
+With RAG:
+- Context-aware responses  
+- Knowledge-based replies  
+
+---
+
+## 📊 Highlights
+
+- Emotion-aware chatbot  
+- Personalized responses  
+- RAG-based intelligence  
+- Full-stack architecture  
+
+---
+
+## 🔮 Future Improvements
+
+- Voice input  
+- Mood analytics  
+- Cloud deployment  
+- Mobile app  
+
+---
+
+
+
+## 📄 License
+
+This project is developed for academic purposes.
+
+---
+
+## ⭐ Acknowledgements
+
+- HuggingFace  
+- LangChain  
+- FAISS  
+- React & Node.js  
+
+---
+
+## 🚀 Final Note
+
+CalmPulse demonstrates how AI can be used to support mental well-being through intelligent and
